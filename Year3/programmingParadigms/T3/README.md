@@ -28,27 +28,3 @@ $$\begin{array}{|l|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|c|}
 We would like to allocate modules to lecturers to **maximise expertise**.
 
 Use Python and Z3 to identify an allocation of modules to lecturers that has the maximum possible expertise, for any given set of modules, lecturers and $k$.
-
-Your solution should be in a single Python script, named `allocations.py`,
-which when executed prints the answer to the terminal. (Both the *lecturer-modules allocations* and resulting *total expertise used*).
-
-
-## Rules
-
-- You are allowed to make use of functions from the Python standard library or the Z3
-module (the version installed on Codio).
-  Make sure your code contains the necessary import statements.
-- You are not allowed to make use of functions from outside the standard library other than from the Z3 module.
-  Your code will be marked by the installation of Python3 on Codio with no additional installs made.
-- The code you write must be your own.
-  You can look at the 6008CEM Codio guide or the textbooks recommended on Talis for help.
-- List any external resources used to help you complete your work as comments in your code. (URLs, etc.)
-
-## Marking Guidance
-
-| | |
-|--------:|:-----------------------|
-|10 marks:| Z3 code to find a feasible solution.|
-|10 marks:| Z3 code to find an optimal solution.|
-| 5 marks:| Documentation (function encapsulation, docstrings, and comments)|
-| 5 marks:| Effective use of GitHub.       |
