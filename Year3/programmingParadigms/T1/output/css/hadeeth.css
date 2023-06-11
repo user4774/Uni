@@ -1,0 +1,302 @@
+:root {
+    --kb-right: 100px;
+    --kb-left: 120px;
+    --kb-colour-red: rgb(131, 15, 15);
+    --kb-colour-green: rgb(24, 110, 37);
+    --kb-colour-darkgreen: rgb(17, 69, 25);
+    --kb-colour-matn: rgb(103, 31, 31);
+    --kb-color-ziyaddah: rgb(41, 130, 214);
+    --kb-colour-page-bg: #faf3cf;
+    --kb-colour-quran-bg: #faefbc;
+}
+
+@font-face {
+    font-family: mainfont;
+    src: url(fonts/NotoSansArabic/NotoSansArabic-Regular.ttf);
+}
+
+@font-face {
+    font-family: h1font;
+    src: url(fonts/ReemKufiInk-Regular.ttf)
+}
+
+@font-face {
+    font-family: h2font;
+    src: url(fonts/ReadexPro/ReadexPro-Light.ttf)
+}
+
+@font-face {
+    font-family: h3font;
+    src: url(fonts/Vazirmatn/Vazirmatn-Regular.ttf);
+}
+
+@font-face {
+    font-family: quranfont;
+    src: url(fonts/Vazirmatn/Vazirmatn-Regular.ttf);
+}
+
+@font-face {
+    font-family: salahfont;
+    src: url(fonts/Amiri/Amiri-Regular.ttf)
+}
+
+@font-face {
+    font-family: haddathana;
+    src: url(fonts/NotoNastaliqUrdu/NotoNastaliqUrdu-Regular.ttf)
+}
+
+
+/* --------------------------------------------------------- */
+/* --------------------------------------------------------- */
+/* --------------------------------------------------------- */
+
+* {
+    direction: rtl !important;
+}
+
+html {
+    background: #eee;
+}
+
+body {
+    direction: rtl;
+    text-align: justify;
+    padding: 0;
+    font: 32px/1.75 mainfont;
+    widows: 17%;
+    background-color: var(--kb-colour-page-bg);
+    margin-right: var(--kb-right);
+    margin-left: var(--kb-left);
+    margin-top: 1em;
+    padding: 1.4em;
+    border: solid 1px gray;
+    border-right-width: 4px;
+    border-bottom-width: 4px;
+}
+
+.shi3r,
+.rajaz {
+    display: block;
+    text-align: center;
+}
+
+.matn {
+    font-weight: bold;
+    color: var(--kb-colour-matn);
+}
+
+h1,
+h2,
+h3 {
+    text-align: center;
+    width: 80%;
+    margin: auto;
+    line-height: 1.75em;
+}
+
+h1 {
+    font-family: h1font;
+    font-size: 1.5em;
+    color: var(--kb-colour-red);
+    /* margin: 0 1em; */
+}
+
+h2 {
+    font-family: h2font;
+    font-size: 1.25em;
+    color: var(--kb-colour-darkgreen);
+}
+
+h3 {
+    font-family: h3font;
+    color: var(--kb-colour-green);
+}
+
+h4 {
+    display: inline-block;
+    font-family: h3font;
+    font-weight: bold;
+    /* color: var(--kb-colour-green); */
+}
+
+center {
+    display: inline;
+    background-color: #eeeeee;
+    padding: 0 0.2em;
+    border-radius: 0.2em;
+}
+
+/* ------------------------------------------- */
+
+.quran {
+    font-family: quranfont;
+    /* line-height: 3em; */
+    color: var(--kb-colour-green);
+    background-color: var(--kb-colour-quran-bg);
+    border-radius: 0.4em;
+    padding: 0 0.25em;
+    margin: 0 0.25em;
+}
+
+/* ------------------------------------------- */
+
+.rightmargin,
+.number {
+    /* content: attr(n); */
+    color: red;
+    position: absolute;
+    opacity: 0.75;
+    font-size: 0.9em;
+    /* width: 0; */
+    right: 10px;
+    /* right: -130px; */
+}
+
+
+.leftmargin,
+.pagenumber {
+    display: block;
+    color: red;
+    position: absolute;
+    /* opacity: 0.75; */
+    font-size: 0.5em;
+    width: var(--kb-left);
+    left: -10px;
+    /* left: 0; */
+    /* transform: rotate(-90deg); */
+}
+
+.pagenumber {
+    display: none;
+}
+
+sup {
+    font-size: 0.67em;
+    color: red;
+}
+
+.ref {
+    font-size: 0.67em;
+    color: blue;
+    display: block;
+    position: absolute;
+    width: 180px;
+    /*var(--kb-left);*/
+    left: 10px;
+}
+
+.rw {
+    color: rgb(163, 57, 18);
+}
+
+a {
+    color: rgb(139, 30, 30);
+}
+
+sup {
+    color: #ff0000;
+}
+
+.author {
+    text-shadow: 0 0 16px black;
+}
+
+.special {
+    text-shadow: 0 0 7px rgba(0, 0, 0, 0.5);
+}
+
+.place {
+    text-shadow: 0 0 16px rgba(165, 42, 42, 0.75);
+}
+
+.not_in_db {
+    text-decoration: red dotted underline 2px;
+}
+
+.salah {
+    font-family: salahfont;
+    color: var(--kb-colour-green);
+    font-size: 1.2em;
+}
+
+.grade_color_1 {
+    color: rgb(17, 155, 43);
+    text-shadow: 0 0 7px rgb(33, 180, 112, 0.6);
+}
+
+.grade_color_2 {
+    color: green;
+    text-shadow: 0 0 7px rgba(0, 128, 0, 0.6);
+}
+
+.grade_color_3 {
+    color: green;
+}
+
+.grade_color_4 {
+    color: blue;
+}
+
+.grade_color_5 {
+    color: blue;
+}
+
+.grade_color_6 {
+    color: blue;
+}
+
+.grade_color_7 {
+    color: rgb(195, 93, 25);
+}
+
+.grade_color_8 {
+    color: rgb(255, 77, 0);
+}
+
+.grade_color_9 {
+    color: rgb(195, 93, 25);
+}
+
+.grade_color_10 {
+    color: red;
+    text-shadow: 0 0 7px rgba(255, 0, 0, 0.3);
+}
+
+.grade_color_11 {
+    color: red;
+    text-shadow: 0 0 7px red;
+}
+
+.grade_color_12 {
+    color: red;
+    text-shadow: 0 0 14px red;
+}
+
+.grade_color_13 {
+    color: rgb(127, 17, 155);
+}
+
+.narrator_ungraded {
+    color: rgb(100, 40, 40);
+    font-weight: bold;
+}
+
+.poem_verse {
+    display: block;
+    width: 95%;
+    margin: 0 auto; /* center */
+    padding: 0.2em;
+    background-color: rgba(165, 42, 42, 0.07);
+}
+
+.haddathana {
+    font-family: haddathana;
+    font-size: 1.2em;
+}
+
+.info1 {
+    opacity: 0.5;
+}
+
+.info2 {
+}
