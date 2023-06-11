@@ -1,0 +1,308 @@
+section .data
+newline db 10
+locations db 'locations.txt', 0h
+temperatures db 'temperatures.txt', 0h
+welcome db 'Welcome to Higher or Lower! Type "s" to continue, or "q" to quit at any time.', 0h
+welcomeLength equ $ - welcome
+questionBase db 'Is the temperature in ', 0h
+questionBaseLength equ $ - questionBase
+questionMiddle db ' higher or lower than in ', 0h
+questionMiddleLength equ $ - questionMiddle
+first db 'mh', 0h
+pclen equ $ - first
+second db 'x', 0h
+third db 44, 0h
+score db 0, 0h
+
+section .bss
+fd resb 1
+randomOne resb 8
+randomTwo resb 8
+waste resb 1
+answer resb 1
+num1 resb 8
+printNum resb 1
+fileOne resb 64
+fileTwo resb 64
+
+%macro memoryMap 2
+	mov rdi, %1
+	call mmap
+	mov %2, rax
+	%endmacro
+
+%macro randomMacro 1
+	call random
+	mov %1, rdx
+	%endmacro
+
+%macro printPlace 2
+	mov dl, %2
+	mov rax, %1
+	call findLocation
+	call locationLength
+	%endmacro
+
+%macro printOther 2 
+      mov   rsi, %1
+      mov   rdx, %2
+      mov   rax, 1
+      mov   rdi, 1
+      syscall
+   %endmacro 
+
+section .text
+global _start
+
+
+_start:
+mov rsi, welcome
+mov rdx, welcomeLength
+mov rax, 1
+mov rdi, 1
+syscall
+call printNewline
+memoryMap locations, [fileOne]
+memoryMap temperatures, [fileTwo]
+
+call compare
+mov rax, 60
+mov rdi, 0
+syscall
+
+compare:
+	printOther questionBase, questionBaseLength 		;Prints out first half of comparison
+	randomMacro [randomOne]	;Generates a random number
+	printPlace [fileOne], [randomOne]		;Finds random place from locations file
+	call print		;Prints out random location
+	printOther questionMiddle, questionMiddleLength		;Prints out middle part of comparison
+	randomMacro [randomTwo]	;Generates another random number
+	printPlace [fileOne], [randomTwo]		;Finds other random place from locations file
+	call print		;Prints out other random location
+	printPlace [fileTwo], [randomOne]	;Finds temperature integer from one location
+	call atoi		;Converts the ascii number to an integer
+	mov rax, rdx		;Move random result to rax
+	push rax		;Push rax to stack
+	printPlace [fileTwo], [randomTwo]					;Finds temperature integer from other location
+	call atoi		;Converts the ascii number to an integer
+	pop rax			;Remove rax from stack
+	cmp rax, rdx		;Compare temperatures in rax and rdx
+	jg .higher		;Check if rax higher
+	jl .lower		;Check if rax lower
+	je .points		;Check if equal
+.higher:
+	call userInput										;Call userInput
+	mov rax, "h"										;move h to rax
+	cmp rax, [answer]									;Compare user input to h
+	je .points											;jump to points if equal
+	jne .reduction										;if not equal, jump to reduction
+.lower:											
+	call userInput										;Call userInput
+	mov rax, "l"										;move l to rax
+	cmp rax, [answer]									;Compare user input to l
+	je .points											;jump to points if equal
+	jne .reduction										;if not equal, jump to reduction
+.points
+	call userInput										;Call userInput
+	mov rax, "y"										;move y to rax
+	cmp rax, [answer]									;Compare user input to y
+	je .yes												;Jump if equal
+	mov rax, [score]									;move score value to rax
+	add rax, 1											;add 1 to rax
+	mov [score], rax	mov rax back to score
+	ret			;return to previous location
+.yes:
+	xor rax, rax	;clear rax
+	mov rax, [score]	;move score to rax
+	add rax, 2		;add 2 to rax
+	mov [score], rax	;move rax back to score
+	
+	call itoa
+	
+	ret
+.reduction:
+	push rax
+	mov rax, [score]
+	cmp rax, 0
+	je .end
+	pop rax
+	cmp rax, "y"
+	je .doubleLoss
+	mov rax, [score]
+	sub rax, 1
+	mov [score], rax
+.doubleLoss:
+	mov rax, [score]
+	cmp rax, 2
+	jl .zero
+	mov rax, [score]
+	sub rax, 1
+	mov [score], rax
+	ret
+.zero:
+	mov rax, 0
+	mov [score], rax
+.end:
+	ret
+
+userInput:
+;function to get user input
+	mov rax, 0			;read command system call
+	mov rdi, 0			;file descriptor of stdin to rdi
+	mov rsi, answer		;move char buffer to rsi
+	mov rdx, 1			;size of input
+	syscall				;syscall interrupt
+	mov rax, 0			;repeat to get rid of newline
+	mov rdi, 0
+	mov rsi, waste
+	mov rdx, 1
+	syscall
+	ret	
+
+mmap:
+;function to map file to memory
+	call lseek 		;call lseek
+	mov rdi, 0		;let op system choose mapping location
+	mov rsi, rax	;file size from rax to rsi
+	mov r8, [fd]	;file descriptor for file to map
+	mov r9, 0		;offset in file
+	mov rdx, 1		;prot read to mark memory as read only
+	mov r10, 2		;set pages to private
+	mov rax, 9		;system call name for mmap
+	syscall
+	ret
+
+lseek:
+	call open		;function call to open file
+	mov rdi, [fd]	;save file descriptor to rdi
+	mov rax, 8		;opcode for lseek
+	mov rsi, 0		;offset from start of file
+	mov rdx, 2		;starting location for lseek
+	syscall			;syscall to activate function
+	ret
+
+findLocation:
+;function to find location based on random number
+	mov cl, 0
+	cmp cl, dl
+	je .endZero
+.loop:
+	cmp cl, dl ;[dx]	;compare cl to randomly generated number
+	je .end
+	inc rax				;increment rax by one
+	cmp byte [rax], ','		;compare byte in rax to ,
+	jne .loop
+	add cl, 1		;add 1 to cl
+	jmp .loop
+.end:
+	inc rax
+.endZero:
+	ret
+
+locationLength:
+;function to loop over location to save its length
+	mov rdx, rax		
+.loop:
+	cmp byte [rdx], ','		;check if at start of next location
+	je .end
+	cmp byte [rdx], 10
+	je .end
+	inc rdx
+	jmp .loop
+.end:
+	sub rdx, rax
+	ret
+
+print:
+;function to print location
+	mov rsi, rax
+	mov rax, 1
+	mov rdi, 1
+	syscall
+	ret
+
+open:
+;function to open file
+	mov rax, 2		;opcode to open file
+	mov rsi, 0		;0 flag to rsi
+	syscall
+	mov [fd], rax
+	ret
+
+random:
+;function to randomly generate number
+	rdrand rax 			;create random 64 bit number
+	xor rdx, rdx		;clear rdx for division
+	mov rbx, 10			;insert 10 to rbx
+	div rbx				;divide rax with rbx to get random number between 0 and 9
+	ret ; return
+
+itoa:
+;function to convert integer to string and then print it
+	mov rax, [score]	
+	xor rdx, rdx
+.loop:
+	mov rdx, 0		;set rdx to 0
+	mov rcx, 10		;add 10 to rcx
+	idiv rcx		;divide rax with rcx
+	cmp rax, 0		;check if rax is 0
+	je .remainder		;if 0, go to remainder
+	add rax, 48		;convert int to ascii number by adding 48
+	push rdx		;push rdx to stack
+	mov [printNum], rax	;save rax to printNum
+	mov rsi, printNum	;save printnum buffer to rsi
+	mov rax, 1		;opcode for writing
+	mov rdi, 1		;file descriptor for stdout
+	mov rdx, 1
+	syscall
+	pop rdx				;get rdx from stack
+	mov rax, rdx			;move rdx to rax
+	jmp .loop			;back to loop
+.remainder:
+	add rdx, 48			;add 48 to change int to ascii
+	mov [printNum], rdx		;repeated function to print number
+	mov rsi, printNum
+	mov rax, 1
+	mov rdi, 1
+	mov rdx, 1
+	syscall
+	ret
+
+atoi:
+;function to convert ascii to integer, including signed int
+;function found from https://stackoverflow.com/questions/42890917/converting-a-string-of-numbers-into-an-integer-in-assembly-x86
+	mov r15b, 0				
+	cmp byte [rax], '-'		
+	jne .skip				
+	mov r15b, 1				
+	inc rax
+.skip:
+	mov rcx, rdx
+    mov rsi, rax
+
+    cld                  
+    xor rdx, rdx            
+    xor rax, rax            
+
+counter:
+    imul rdx, 10     
+    lodsb             
+    sub al, 48             
+    add rdx, rax        
+    loop counter          
+	
+	cmp r15b, 1
+	jne .end
+	neg rdx
+.end:
+	ret
+
+
+printNewline:
+;function to print newline
+	mov rax, 1
+    mov rdi, 1
+    mov rsi, newline
+    mov rdx, 1
+    syscall
+	ret

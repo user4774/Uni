@@ -1,0 +1,405 @@
+Server:
+//tcp-server.cc
+// tcp-server that chops up the input and checks if the chunks 
+// are words and number
+//You need to put a fullstop at the end (.) so get last word
+//For example
+//Hamzepur VIP 3 2 Saturday 1 0.
+
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <iostream>
+#include <cstring>
+#include <stdlib.h>
+#include <string>
+#include <unordered_map>
+#include <vector>
+#include <ctype.h>
+#include <set>
+
+
+#define MAX_MSG 500
+#define LINE_ARRAY_SIZE (MAX_MSG+1)
+
+using namespace std;
+
+unordered_map<string, vector<int>> availableBookings = {{"VIP", {5, 5}}, {"SATURDAY", {25, 25}}, {"SUNDAY", {20, 20}}, {"WEEKEND", {15, 15}}}; // Map to store current available bookings
+unordered_map<string, vector<int>> availableEvents = {{"BAKING", {5, 5}}, {"DANCING", {5, 5}}, {"CRAFT", {5, 5}}, {"DISCO", {5, 5}}};		// Map to store available events
+set<string> waitingList; 		// Waiting list to store booking requests for events that have run out of tickets
+unordered_map<string, int> purchases;		// Map for user purchases
+
+// function that checks if the chunk  extracted from the order is a number
+bool isNumber(string word)
+{
+    for (int character = 0; character < word.length(); character++){
+        if (isdigit(word[character]) == false)
+            return false;
+ }
+    return true;
+}
+
+void sendToClient(int connectSocket, const char* line) {
+  // Send converted line back to client.
+  if (send(connectSocket, line, strlen(line) + 1, 0) < 0)
+    cerr << "Error: cannot send modified data";
+}
+
+void checkTicketCount(string& name, string type, int& adult, int& child, string& extra, unordered_map<string, vector<int>>& availableTickets) {
+	// Function to check for available tickets and change users booking accordingly
+  if (purchases[name] > 30 || adult > 30 || child > 30) {		// Check to make sure the user isn't buying too many tickets
+    extra = "You are trying to purchase too many tickets or have already made too many purchases. ";
+    adult = 0;
+	child = 0;
+  } else if (availableTickets[type][0] < adult) {		// Check to see if enough tickets available
+    int waiting = adult - availableTickets[type][0];	// number of tickets the user cannot buy
+    adult = availableTickets[type][0];					// allocate all available tickets to user
+    availableTickets[type][0] = 0;						// Set available tickets to 0
+    extra = "Unfortunately we don't have enough " + type + " tickets for adults. We will notify you once we have more. ";
+    waitingList.insert(name);							// Add user to waiting list
+    purchases[name] += adult;							// Add users purchases to the purchases map
+  } else {
+    availableTickets[type][0] = availableTickets[type][0] - adult;	//remove tickets purchased by the user from the available tickets
+    purchases[name] += adult;
+  }
+  
+  if (purchases[name] > 30 || adult > 30 || child > 30) {
+    extra = "You are trying to purchase too many tickets or have already made too many purchases. ";
+    child = 0;
+	adult = 0;
+  } else if (availableTickets[type][1] < child) {
+    child = availableTickets[type][1];
+    availableTickets[type][1] = 0;
+	if (extra.size() != 0) {
+		extra = "Unfortunately we don't have enough " + type + " tickets for adults or children. We will notify you once we have more. ";
+	} else {
+		extra = "Unfortunately we don't have enough " + type + " tickets for children. We will notify you once we have more. ";
+	}
+    waitingList.insert(name);
+    purchases[name] += child;
+    
+  } else {
+    availableTickets[type][1] = availableTickets[type][1] - child;
+    purchases[name] += child;
+  }
+}
+
+float getEventPrice(string& name, string type, string adultString, string childString, string& extra) {
+	// Function to calculate total price for events
+  int adult = stoi(adultString);		//convert string of number of tickets to integers
+  int child = stoi(childString);
+  float price = 0;						// Set price to 0
+  checkTicketCount(name, type, adult, child, extra, availableEvents);		// Call function to check and allocate available tickets
+  //Check for specific event types and create price accordingly
+  if (type == "BAKING") {
+    price += adult * 8 + child * 5;
+    return price;
+    
+  } else if (type == "DANCING") {
+      price += adult * 15 + child * 10;
+      return price;
+      
+  } else if (type == "CRAFT") {
+      price += adult * 10 + child * 7.5;
+      return price;
+      
+  } else if (type == "DISCO") {
+      price += adult * 15 + child * 11;
+      return price;
+  }
+}
+
+float getBookingPrice(string& name, string type, string adultString, string childString, string& extra) {
+	// Function to calculate total price for booking
+  int adult = stoi(adultString);
+  int child = stoi(childString);
+  float price = 0;
+  checkTicketCount(name, type, adult, child, extra, availableBookings);
+  
+  if (type == "VIP") {
+    price += adult * 50 + child * 25;
+    return price;
+    
+  } else if (type == "SATURDAY") {
+      price += adult * 25 + child * 20;
+      return price;
+      
+  } else if (type == "SUNDAY") {
+      price += adult * 10 + child * 7.5;
+      return price;
+      
+  } else if (type == "WEEKEND") {
+      price += adult * 30 + child * 22;
+      return price;
+  }
+}
+
+int main()
+{
+  int listenSocket, connectSocket, i;
+  unsigned short int listenPort;
+  socklen_t clientAddressLength;
+  struct sockaddr_in clientAddress, serverAddress;
+  char line[LINE_ARRAY_SIZE];
+
+  cout << "Enter port number to listen on (between 1500 and 65000): ";
+  cin >> listenPort;
+
+  // Create socket for listening for client connection
+  // requests.
+  listenSocket = socket(AF_INET, SOCK_STREAM, 0);
+  if (listenSocket < 0) {
+    cerr << "cannot create listen socket";
+    exit(1);
+  }
+  
+  // Bind listen socket to listen port. First set various
+  // fields in the serverAddress structure, then call
+  // bind().
+
+  // htonl() and htons() convert long integers and short
+  // integers (respectively) from host byte order (on x86
+  // this is Least Significant Byte first) to network byte
+  // order (Most Significant Byte first).
+  serverAddress.sin_family = AF_INET;
+  serverAddress.sin_addr.s_addr = htonl(INADDR_ANY);
+  serverAddress.sin_port = htons(listenPort);
+  
+  if (bind(listenSocket,
+           (struct sockaddr *) &serverAddress,
+           sizeof(serverAddress)) < 0) {
+    cerr << "cannot bind socket";
+    exit(1);
+  }
+
+  // Wait for connections from clients. This is a
+  // non-blocking call; i.e., it registers this program with
+  // the system as expecting connections on this socket, and
+  // then this thread of execution continues on.
+  listen(listenSocket, 5);
+  
+  while (1) {
+    cout << "Waiting for TCP connection on port " << listenPort << " ...\n";
+
+
+    // Accept a connection with a client that is requesting
+    // one. The accept() call is a blocking call; i.e., this
+    // thread of execution stops until a connection comes
+    // in. connectSocket is a new socket that the system
+    // provides, separate from listenSocket. We *could*
+    // accept more connections on listenSocket, before
+    // connectSocket is closed, but this program doesn't do
+    // that.
+    clientAddressLength = sizeof(clientAddress);
+    connectSocket = accept(listenSocket,
+                           (struct sockaddr *) &clientAddress,
+                           &clientAddressLength);
+    if (connectSocket < 0) {
+      cerr << "cannot accept connection ";
+      exit(1);
+    }
+    
+    // Show the IP address of the client.
+    // inet_ntoa() converts an IP address from binary form to the
+    // standard "numbers and dots" notation.
+    cout << "  connected to " << inet_ntoa(clientAddress.sin_addr);
+
+    // Show the client's port number.
+    // ntohs() converts a short int from network byte order (which is
+    // Most Significant Byte first) to host byte order (which on x86,
+    // for example, is Least Significant Byte first).
+    cout << ":" << ntohs(clientAddress.sin_port) << "\n";
+
+    // Read lines from socket, using recv(), storing them in the line
+    // array.  If no messages are currently available, recv() blocks
+    // until one arrives.
+    // First set line to all zeroes, so we'll know where the end of
+    // the string is.
+    memset(line, 0x0, LINE_ARRAY_SIZE);
+    vector<string> userInput = {};
+    string word = "";
+    bool bookingComplete = false;    
+    float price = 0;
+    string extra = "";
+    string name = "";
+    
+    while (recv(connectSocket, line, MAX_MSG, 0) > 0) {
+      cout << "  --  " << line << "\n";
+
+      for (i = 0; line[i] != '\0'; i++){
+		  extra = "";
+      //the user need to end the order with a full stop (.) to get last word/number 
+        if ((line[i] != ' ') && (line[i] != '.')) {
+        if (isalpha(line[i])) {
+          word += toupper(line[i]);		// Change user input to uppercase
+        } else {
+          word += line[i]; 				
+        }
+          } else {
+            userInput.push_back(word);	// Add user input to list 
+            word = "";					// reset word
+          }
+        }
+        
+        if (!bookingComplete) {        // Check if user has made booking 
+          if (userInput.size() > 0 && (userInput.size() - 1) % 3 == 0) {	//Check if user submitted their booking in an acceptable format
+            name = userInput[0];	//Save users name
+            for (int j = 3; j <= userInput.size(); j += 3) { 	//loop over users booking 
+              price += getBookingPrice(name, userInput[j - 2], userInput[j - 1], userInput[j], extra); 		// Calculate booking price with getBookingPrice method
+              }
+          } else {
+            sprintf(line, "Please enter valid booking information.");		//Ask the user to input valid booking information
+            sendToClient(connectSocket, line);								//Send text to client
+          }
+          if (price <= 0) {													//Check if user has actually booked anything
+            sprintf(line, "Please enter valid booking information.");		
+          } else {
+            bookingComplete = true;											//set booking status to true
+            sprintf(line,"%sThe cost of your booking is: %f ", extra.c_str(), price);	//create message informing user that their booking was successful
+          }
+          
+          userInput = {};	//empty user input
+          // Send converted line back to client.
+          sendToClient(connectSocket, line);
+        } else {
+          if (userInput.size() % 3 == 0) {		//Check if user submitted their booking in an acceptable format
+            for (int j = 3; j <= userInput.size(); j += 3) {		//loop over users booking 
+              price += getEventPrice(name, userInput[j - 3], userInput[j - 2], userInput[j - 1], extra);	// Calculate event price with getBookingPrice method
+              bookingComplete = false;		//Set booking back to false for next user
+            }
+          } else {
+            sprintf(line, "Please enter valid event information.");		
+            sendToClient(connectSocket, line);
+          }
+          if (price >= 500) {		//Check if user booking is over 500
+            price = price * 0.90;	// Add 10% discount
+          }
+			sprintf(line,"%sYour total booking cost will be: %f ", extra.c_str(), price);	//Return full booking price to user
+          userInput = {};
+          // Send converted line back to client.
+          sendToClient(connectSocket, line);            
+        }
+        memset(line, 0x0, LINE_ARRAY_SIZE);  // set line to all zeroes    
+    }    
+  }
+}
+
+
+
+Client:
+#include <netdb.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <iostream>
+#include <cstring>
+#include <stdlib.h>
+
+#define MAX_LINE 500
+#define LINE_ARRAY_SIZE (MAX_LINE+1)
+
+using namespace std;
+
+int main()
+{
+  int socketDescriptor;
+  unsigned short int serverPort;
+  struct sockaddr_in serverAddress;
+  struct hostent *hostInfo;
+  char buf[LINE_ARRAY_SIZE], c;
+
+  cout << "Enter server host name or IP address: ";
+  cin.get(buf, MAX_LINE, '\n');
+
+  // gethostbyname() takes a host name or ip address in "numbers and
+  // dots" notation, and returns a pointer to a hostent structure,
+  // which we'll need later.  It's not important for us what this
+  // structure is actually composed of.
+  hostInfo = gethostbyname(buf);
+  if (hostInfo == NULL) {
+    cout << "problem interpreting host: " << buf << "\n";
+    exit(1);
+  }
+
+  cout << "Enter server port number: ";
+  cin >> serverPort;
+  cin.get(c); // dispose of the newline
+
+  // Create a socket.  "AF_INET" means it will use the IPv4 protocol.
+  // "SOCK_STREAM" means it will be a reliable connection (i.e., TCP;
+  // for UDP use SOCK_DGRAM), and I'm not sure what the 0 for the last
+  // parameter means, but it seems to work.
+  socketDescriptor = socket(AF_INET, SOCK_STREAM, 0);
+  if (socketDescriptor < 0) {
+    cerr << "cannot create socket\n";
+    exit(1);
+  }
+
+  // Connect to server.  First we have to set some fields in the
+  // serverAddress structure.  The system will assign me an arbitrary
+  // local port that is not in use.
+  serverAddress.sin_family = hostInfo->h_addrtype;
+  memcpy((char *) &serverAddress.sin_addr.s_addr,
+         hostInfo->h_addr_list[0], hostInfo->h_length);
+  serverAddress.sin_port = htons(serverPort);
+				
+  if (connect(socketDescriptor,
+              (struct sockaddr *) &serverAddress,
+              sizeof(serverAddress)) < 0) {
+    cerr << "cannot connect\n";
+    exit(1);
+  }
+  cout << "\nWelcome to the Robotics Festival booking system\n";
+  cout << "Please enter your booking details below!\n";
+
+  // Prompt the user for input, then read in the input, up to MAX_LINE
+  // charactars, and then dispose of the rest of the line, including
+  // the newline character.
+  cout << "Input: ";
+  cin.get(buf, MAX_LINE, '\n');
+  while (cin.get(c) && c != '\n') 
+    ; //Loop does nothing except consume the spare bytes
+
+
+  // Stop when the user inputs a line with just a dot.
+  while (strcmp(buf, ".")) { //strcmp returns 0 when the two strings
+			     //are the same, so this continues when
+			     //they are different
+    // Send the line to the server.
+    if (send(socketDescriptor, buf, strlen(buf) + 1, 0) < 0) {
+      cerr << "cannot send data ";
+      close(socketDescriptor); //Note this is just like using files...
+      exit(1);
+    }
+
+    // Zero out the buffer.
+    memset(buf, 0x0, LINE_ARRAY_SIZE);
+
+    // Read the modified line back from the server.
+    if (recv(socketDescriptor, buf, MAX_LINE, 0) < 0) {
+      cerr << "didn't get response from server?";
+      close(socketDescriptor);
+      exit(1);
+    }
+	
+    cout << buf << "\n";
+	if (buf[0] == 'T') {	//Check if user finished booking
+		cout << "Would you like to book any events for the festival?" << "\n";			//Inform the user of potential events
+		cout << "If not, enter a full stop to save your booking and exit." << "\n";
+	} else if (buf[0] == 'Y') {
+		cout << "Thank you for taking part in the Robotics festival." << "\n";		// Thank user for purchasing tickets
+		break;																		// Exit program
+	}
+
+    // Prompt the user for input, then read in the input, up to MAX_LINE
+    // charactars, and then dispose of the rest of the line, including
+    // the newline character.  As above.
+    cout << "Input: ";
+    cin.get(buf, MAX_LINE, '\n');
+    while (cin.get(c) && c != '\n')
+      ; //Chomp chomp chomp
+  }
+
+  close(socketDescriptor);
+  return 0;
+}
